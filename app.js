@@ -8,20 +8,17 @@ var ExpressOIDC = require("@okta/oidc-middleware").ExpressOIDC;
 
 const dashboardRouter = require("./routes/dashboard");
 const publicRouter = require("./routes/public");
+const usersRouter = require("./routes/users");
 
 var app = express();
 var oktaClient = new okta.Client({
-  orgUrl: '{yourOktaOrgUrl}',
-  token: '{yourOktaToken}'
+  orgUrl: '{https://dev-223572.okta.com}',
+  token: '{00oJLhv9QSlIRTBEFQYC-HuhddrUi9-Kcs3mjv4SL2}'
 });
 const oidc = new ExpressOIDC({
-  issuer: "{yourOktaOrgUrl}/oauth2/default",
-  client_id: {
-    yourClientId
-  },
-  client_secret: {
-    yourClientSecret
-  },
+  issuer: "{https://dev-223572.okta.com}/oauth2/default",
+  client_id: {0oa9qocb00LeYmjtv4x6},
+  client_secret: {ISsnM5b6XKjkkY6nlktAZv7JFU_uUISC1jBP1VbZ},
   redirect_uri: 'http://localhost:3000/users/callback',
   scope: "openid profile",
   routes: {
@@ -50,9 +47,33 @@ app.use(session({
   resave: true,
   saveUninitialized: false
 }));
+app.use(oidc.router);
+app.use((req, res, next) => {
+  if (!req.userinfo) {
+    return next();
+  }
+
+  oktaClient.getUser(req.userinfo.sub)
+    .then(user => {
+      req.user = user;
+      res.locals.user = user;
+      next();
+    }).catch(err => {
+      next(err);
+    });
+});
+
+function loginRequired(req, res, next) {
+  if (!req.user) {
+    return res.status(401).render("unauthenticated");
+  }
+
+  next();
+}
 
 app.use('/', publicRouter);
-app.use('/dashboard', dashboardRouter);
+app.use('/dashboard', loginRequired, dashboardRouter);
+app.use('/users', usersRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
